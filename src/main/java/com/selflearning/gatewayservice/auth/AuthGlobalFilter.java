@@ -68,7 +68,16 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             return writeUnauthorized(exchange, "missing or malformed Authorization header");
         }
 
+        // 注意：错误处理只能包在 validateToken(...) 这一段上，不能包到 flatMap 里的
+        // chain.filter(...)（那是转发给下游业务服务的真实请求）。之前这两个 onErrorResume
+        // 是接在整条链最后的，Reactor 里这样写会把 chain.filter(...) 抛出的任何异常也一并
+        // 吞掉——包括下游服务没启动/负载均衡找不到实例时抛出的 NotFoundException——统统被
+        // 错误地包装成 401 "token validation failed" 返回给前端，即便 token 本身完全有效。
+        // 前端因此把"后端服务不可用"误判成"登录过期"，尝试刷新 token 再重试一次，重试同样
+        // 因为服务没启动而失败，最终把用户直接踢回登录页——这是 2026-08-11 排查一次"登录后
+        // 又跳回登录页"用户反馈时定位到的真实根因，而不是 token/session 机制本身的问题。
         return validateToken(accessToken, authorization)
+                .onErrorMap(ex -> !(ex instanceof TokenValidationException), ex -> new TokenValidationException(ex.toString()))
                 .flatMap(token -> {
                     if (token.userId() == null || token.username() == null || token.tokenId() == null) {
                         return writeUnauthorized(exchange, "token validation failed");
@@ -78,10 +87,6 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
                 })
                 .onErrorResume(TokenValidationException.class, ex -> {
                     log.warn("Token validation failed: {}", ex.getMessage());
-                    return writeUnauthorized(exchange, "token validation failed");
-                })
-                .onErrorResume(ex -> {
-                    log.warn("Token validation request failed: {}", ex.toString());
                     return writeUnauthorized(exchange, "token validation failed");
                 });
     }
