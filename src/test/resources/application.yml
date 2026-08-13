@@ -1,0 +1,20 @@
+# Test-classpath override for src/main/resources/application.yml. Without this file, tests boot
+# against the production config as-is: real spring.config.import: nacos:gateway-service.yaml, real
+# spring.cloud.nacos.discovery, and no value at all for gateway.internal-token (GatewayInternalTokenProperties
+# then fails context startup with @NotBlank, or — before that property existed — the test would try to
+# reach a real Nacos server and fail there instead). Neither outcome is what a unit/context test should
+# depend on.
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+
+# Not a real secret — only needs to satisfy GatewayInternalTokenProperties' validation (>=32 chars,
+# not the historical default) so a context-load test can prove the application wires up correctly.
+gateway:
+  internal-token: test-only-gateway-token-not-a-real-secret
