@@ -14,7 +14,6 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -38,17 +37,17 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
     private final WebClient.Builder webClientBuilder;
     private final AuthProperties authProperties;
     private final ObjectMapper objectMapper;
-    private final String gatewayInternalToken;
+    private final GatewayInternalTokenProperties gatewayInternalTokenProperties;
 
     public AuthGlobalFilter(
             WebClient.Builder webClientBuilder,
             AuthProperties authProperties,
             ObjectMapper objectMapper,
-            @Value("${gateway.internal-token}") String gatewayInternalToken) {
+            GatewayInternalTokenProperties gatewayInternalTokenProperties) {
         this.webClientBuilder = webClientBuilder;
         this.authProperties = authProperties;
         this.objectMapper = objectMapper;
-        this.gatewayInternalToken = gatewayInternalToken;
+        this.gatewayInternalTokenProperties = gatewayInternalTokenProperties;
     }
 
     @Override
@@ -160,7 +159,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
                         headers.set(X_SESSION_ID, token.sessionId());
                     }
                     headers.set(X_TOKEN_ID, token.tokenId());
-                    headers.set(X_GATEWAY_TOKEN, gatewayInternalToken);
+                    headers.set(X_GATEWAY_TOKEN, gatewayInternalTokenProperties.internalToken());
                 })
                 .build();
     }
